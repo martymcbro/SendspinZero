@@ -110,9 +110,13 @@ Your Soundbar will love you for it ;) - 3D files for case is in [3D_Files](3D_Fi
 
 | ESP32-S3 GPIO | PCM5102A Pin |
 | ------------- | ------------ |
-| GPIO4         | DATA         |
+| GPIO4         | VIN (DATA)   |
 | 3.3V          | VCC          |
 | GND           | GND          |
+
+Pins on this specific toslink plug:
+<img width="1741" height="774" alt="Screenshot 2026-03-08 at 08 25 18" src="https://github.com/user-attachments/assets/708cf545-3853-44d9-be97-c54bd7d5a25a" />
+
 
 ---
 
