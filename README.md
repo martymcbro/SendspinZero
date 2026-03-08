@@ -108,7 +108,7 @@ Your Soundbar will love you for it ;) - 3D files for case is in [3D_Files](3D_Fi
 
 ### ESP32-S3 → toslink connector
 
-| ESP32-S3 GPIO | PCM5102A Pin |
+| ESP32-S3 GPIO | TOSLINK PLUG |
 | ------------- | ------------ |
 | GPIO4         | VIN (DATA)   |
 | 3.3V          | VCC          |
