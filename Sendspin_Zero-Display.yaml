@@ -125,6 +125,7 @@ captive_portal:
 time:
   - platform: homeassistant
     id: homeassistant_time
+    timezone: Europe/Berlin
 
 globals:
   - id: sendspin_album_art_valid
