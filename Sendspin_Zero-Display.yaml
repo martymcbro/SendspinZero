@@ -10,6 +10,7 @@ substitutions:
 
   # your home assistant weather entity, in most cases the same.
   ha_weather_entity: weather.forecast_home
+  timezone: Europe/Berlin
 
   # Rotating the display, uncomment the block you need (default 0 degree)
 
@@ -125,7 +126,7 @@ captive_portal:
 time:
   - platform: homeassistant
     id: homeassistant_time
-    timezone: Europe/Berlin
+    timezone: ${timezone}
 
 globals:
   - id: sendspin_album_art_valid
