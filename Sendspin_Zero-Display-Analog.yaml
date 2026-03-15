@@ -39,6 +39,23 @@ external_components:
 
 ## END OF SETTINGS ###############################################################################################################################
 
+  # I2S audio pins
+  i2s_lrclk_pin: GPIO4
+  i2s_bclk_pin: GPIO5
+  i2s_dout_pin: GPIO6
+
+  # RGB LED
+  rgb_led_pin: GPIO21
+
+  # SPI pins (for display)
+  spi_clk_pin: GPIO7
+  spi_mosi_pin: GPIO8
+
+  # Display control pins
+  display_dc_pin: GPIO10
+  display_reset_pin: GPIO9
+  display_bl_pin: GPIO11
+
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
@@ -82,6 +99,8 @@ wifi:
   ap:
 
 improv_serial:
+    ssid: "$friendly_name Hotspot"
+    password: !secret ap_password
 
 psram:
   mode: quad
@@ -627,7 +646,7 @@ binary_sensor:
 
 output:
   - platform: ledc
-    pin: GPIO11
+    pin: ${display_bl_pin}
     id: backlight_output
     inverted: false
 
@@ -645,7 +664,7 @@ light:
     id: led
     name: LED light
     entity_category: config
-    pin: GPIO21
+    pin: ${rgb_led_pin}
     chipset: WS2812
     num_leds: 1
     rgb_order: grb
@@ -653,8 +672,8 @@ light:
 
 spi:
   - id: spi_bus
-    clk_pin: 7
-    mosi_pin: 8
+    clk_pin: ${spi_clk_pin}
+    mosi_pin: ${spi_mosi_pin}
 
 display:
   - platform: mipi_spi
@@ -663,8 +682,8 @@ display:
     model: ST7789V
     data_rate: 40MHz
     spi_mode: MODE3
-    dc_pin: 10
-    reset_pin: 9
+    dc_pin: ${display_dc_pin}
+    reset_pin: ${display_reset_pin}
     dimensions:
       width: 240
       height: 240
