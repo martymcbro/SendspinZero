@@ -1,6 +1,6 @@
 ## SendspinZero for Analog + Digital Coax and Toslink versions. Edit the settings below.
 substitutions:
-  name: esphome-web-09a588
+  name: sendspin-zero
   friendly_name: Sendspin Zero Display
 
 ## SETTINGS ######################################################################################################################################
@@ -75,6 +75,9 @@ esp32:
 logger:
   level: WARN
 
+debug:
+  update_interval: 5s
+
 api:
   on_client_connected:
     - lambda: |-
@@ -86,13 +89,14 @@ api:
         }
 
 ota:
-  - platform: esphome
+  platform: esphome
+  password: !secret ota_password
 
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   ap:
-    password: "RZ7D3EzJdPM6"
+    password: !secret ap_password
 
 psram:
   mode: quad
@@ -231,8 +235,41 @@ sensor:
     id: ha_weather_wind_speed
     entity_id: ${ha_weather_entity}
     attribute: wind_speed
+  - platform: wifi_signal
+    name: "${friendly_name} WiFi Signal"
+    update_interval: 60s
+  - platform: uptime
+    name: "${friendly_name} Uptime"
+    update_interval: 60s
+  - platform: internal_temperature
+    name: "${friendly_name} CPU Temperature"
+    update_interval: 60s
+  - platform: template
+    name: "${friendly_name} Free Heap"
+    lambda: |-
+      return heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024.0;
+    unit_of_measurement: 'kB'
+    update_interval: 10s
+  - platform: template
+    name: "${friendly_name} Free PSRAM"
+    lambda: |-
+      return heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024.0;
+    unit_of_measurement: 'kB'
+    update_interval: 10s
+  - platform: debug
+    loop_time:
+      name: "${friendly_name} Loop Time"
 
 text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "${friendly_name} IP"
+    mac_address:
+      name: "${friendly_name} MAC"
+
+  - platform: version
+    name: "${friendly_name} ESPHome Version"
+
   - platform: homeassistant
     id: ha_weather_condition
     entity_id: ${ha_weather_entity}
@@ -577,6 +614,15 @@ switch:
     entity_category: config
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
+
+button:
+  - platform: restart
+    id: restart_btn
+    name: "${friendly_name} REBOOT"
+
+binary_sensor:
+  - platform: status
+    name: "${friendly_name} Status"
 
 output:
   - platform: ledc
