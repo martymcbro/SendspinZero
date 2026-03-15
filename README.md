@@ -120,7 +120,7 @@ Pins on this specific toslink plug:
 
 ---
 
-Links to parts, esp32-s3 zero is same as above, toslink connector that fits the 3d case:
+Links to parts, esp32-s3 zero is same as above, toslink connector that fits the 3D case:
 
 single: https://www.aliexpress.com/item/1005011593001325.html
 
@@ -133,3 +133,10 @@ and 1 M2.6x10 self tapping screw to hold the toslink plug in place
 !IMPORTANT: remember to choose "Transmitting end" (A1)
 
 ---
+Optionally it's possible to use Coax SPDIF output instead of Toslink. - One cord less + one resister (330-470ohm). 3D files for case with and without display in 3D Files.
+
+
+<img width="1000" height="459" alt="Image" src="https://github.com/user-attachments/assets/a638850f-e92f-4705-b995-3655c7c123b7" />
+
+---
+
