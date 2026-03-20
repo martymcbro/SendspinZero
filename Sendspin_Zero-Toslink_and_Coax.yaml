@@ -4,7 +4,7 @@ substitutions:
 esphome:
   name: esphome-web-e82bb8
   friendly_name: Sendspin Zero Toslink
-  min_version: 2026.1.0
+  min_version: 2026.3.0
   name_add_mac_suffix: false
   on_boot:
     priority: -100
@@ -17,7 +17,7 @@ esp32:
     type: esp-idf
 
 logger:
-  level: debug
+  level: warn
 
 api:
   on_client_connected:
@@ -42,54 +42,24 @@ psram:
   mode: quad
   speed: 80MHz
 
-http_request:
-
 captive_portal:
 
 external_components:
   - source:
+      # https://github.com/esphome/esphome/pull/14933
+      type: git
+      url: https://github.com/kahrendt/esphome
+      ref: 890e33f99af2c2ea15dc74c3ec4cf32d25203526
+    components: [const, media_source, sendspin, generic_image]
+  - source:
       # https://github.com/esphome/esphome/pull/12429
       type: git
       url: https://github.com/esphome/esphome
-      ref: a6c403deb7603d316dce2820897902e01c3695cc
+      ref: ff8ce89556748509d7ee8724e12d9d43d3c8c1e8
     refresh: 0s
-    components: [file, http_request, media_source, speaker_source]
-  - source:
-      # https://github.com/esphome/esphome/pull/12284
-      type: git
-      url: https://github.com/esphome/esphome
-      ref: 119a5c25a483c58b3d58a35c8cec95495c6491c2
-    components: [sendspin]
+    components: [http_request]
 
-  # The following sources are merged into the dev branch of ESPHome, but not yet in a release.
-  # We've pinned them to their specific squash merge commit id for reproducable builds.
-  # These should be available in ESPHome 2026.3.0
-  - source:
-      # Dev commit hash for squash merge from PR#10212
-      type: git
-      url: https://github.com/esphome/esphome
-      ref: 903971de12c1b291ca8cd367ce5cdf9af8b304ae
-    components: [runtime_image]
-  - source:
-      # Dev commit hash for squash merge from PR#12258
-      type: git
-      url: https://github.com/esphome/esphome
-      ref: 264c8faedd0ab956b0437ec2ecc0bacae1708923
-    components: [media_player]
-  - source:
-      # Dev commit hash for squash merge from PR#14013
-      type: git
-      url: https://github.com/esphome/esphome
-      ref: ba7134ee3f870ce00d2990d84b142b734028330f
-    components: [mdns]
-  - source:
-      # Dev commit hash for squash merge from PR#14108
-      type: git
-      url: https://github.com/esphome/esphome
-      ref: d2026b4cd74bbeb9b86941bf1887f3d93d639387
-    components: [audio]
-
-  # For SPDIF (TOSLINK) support:
+  # For SPDIF (TOSLINK) support https://github.com/esphome/esphome/pull/8065:
   - source: github://pr#8065
     components: [i2s_audio]
     refresh: 0s
@@ -103,87 +73,83 @@ speaker:
     sample_rate: 44100
     i2s_dout_pin: GPIO4
     spdif_mode: true
-    bits_per_sample: 16bit
     i2s_audio_id: i2s_audio_bus
     dac_type: external
     channel: stereo
-    timeout: 250ms
-    buffer_duration: 250ms
     use_apll: true
 
   - platform: mixer
     id: mixing_speaker
     output_speaker: box_speaker
     num_channels: 2
-    task_stack_in_psram: false
+    task_stack_in_psram: true
     source_speakers:
-      - id: announcement_mixer_input
-        timeout: 250ms
-        buffer_duration: 250ms
-      - id: media_mixer_input
-        timeout: 250ms
-        buffer_duration: 250ms
+      - id: announcement_mixing_input
+      - id: media_mixing_input
 
   - platform: resampler
-    id: media_resampling_input
-    output_speaker: media_mixer_input
+    id: announcement_resampling_speaker
+    output_speaker: announcement_mixing_input
     sample_rate: 44100
-    buffer_duration: 250ms
-    task_stack_in_psram: false
+    bits_per_sample: 16
 
   - platform: resampler
-    id: announcement_resampling_input
-    output_speaker: announcement_mixer_input
+    id: media_resampling_speaker
+    output_speaker: media_mixing_input
     sample_rate: 44100
-    buffer_duration: 250ms
-    task_stack_in_psram: false
 
 sendspin:
   id: sendspin_hub
   task_stack_in_psram: false
-  kalman_process_error: 0.01
+
+http_request:
+  buffer_size_rx: 2048  # Reduces CPU load when streaming audio
+
+audio_file:
+  - id: ready_sound
+    file: ${startup_sound_file}
 
 media_source:
-  - platform: sendspin
-    id: sendspin_source
-    buffer_size: 524288
+  - platform: audio_file
+    id: audio_file_announcement_source
   - platform: http_request
-    id: http_source
-    buffer_size: 44100
-  - platform: file
-    id: file_source
-    files:
-      - id: ready_sound
-        file: ${startup_sound_file}
+    id: http_announcement_source
+    buffer_size: 250000
+  - platform: http_request
+    id: http_media_source
+    buffer_size: 500000
+  - platform: sendspin
+    id: sendspin_media_source
 
 media_player:
   - platform: sendspin
     id: sendspin_group_media_player
+    name: Sendspin Group Media Player
 
   - platform: speaker_source
-    name: none
     id: external_media_player
-    announcement_speaker: announcement_resampling_input
-    media_speaker: media_resampling_input
+    name: Media Player
 
     announcement_pipeline:
       format: FLAC
       num_channels: 1
       sample_rate: 44100
+      speaker: announcement_resampling_speaker
+      sources:
+        - audio_file_announcement_source
+        - http_announcement_source
+
     media_pipeline:
       format: FLAC
       num_channels: 2
       sample_rate: 44100
-
-    # Put the restrictions BACK here (device range)
+      speaker: media_resampling_speaker
+      sources:
+        - http_media_source
+        - sendspin_media_source
     volume_increment: 0.05
-    volume_min: 0.5
-    volume_max: 0.9
-
-    sources:
-      - http_source
-      - sendspin_source
-      - file_source
+    volume_min: 0.4
+    volume_max: 0.85
 
     on_state:
       then:
@@ -216,7 +182,7 @@ script:
           if ((id(external_media_player).state != media_player::MediaPlayerState::MEDIA_PLAYER_STATE_ANNOUNCING) || priority) {
             id(external_media_player)
               ->make_call()
-              .set_media_url("file://" + sound_file)
+              .set_media_url("audio-file://" + sound_file)
               .set_announcement(true)
               .perform();
           }
