@@ -5,7 +5,7 @@ substitutions:
 esphome:
   name: esphome-web-09a588
   friendly_name: Sendspin Zero Display
-  min_version: 2026.2.0
+  min_version: 2026.3.0
   name_add_mac_suffix: false
   on_boot:
     priority: -100
@@ -45,8 +45,6 @@ psram:
   mode: quad
   speed: 80MHz
 
-http_request:
-
 captive_portal:
 
 time:
@@ -55,46 +53,18 @@ time:
 
 external_components:
   - source:
+      # https://github.com/esphome/esphome/pull/14933
+      type: git
+      url: https://github.com/kahrendt/esphome
+      ref: 890e33f99af2c2ea15dc74c3ec4cf32d25203526
+    components: [const, media_source, sendspin, generic_image]
+  - source:
       # https://github.com/esphome/esphome/pull/12429
       type: git
       url: https://github.com/esphome/esphome
-      ref: a6c403deb7603d316dce2820897902e01c3695cc
+      ref: ff8ce89556748509d7ee8724e12d9d43d3c8c1e8
     refresh: 0s
-    components: [file, http_request, media_source, speaker_source]
-  - source:
-      # https://github.com/esphome/esphome/pull/12284
-      type: git
-      url: https://github.com/esphome/esphome
-      ref: 119a5c25a483c58b3d58a35c8cec95495c6491c2
-    components: [generic_image, sendspin]
-
-  # The following sources are merged into the dev branch of ESPHome, but not yet in a release.
-  # We've pinned them to their specific squash merge commit id for reproducable builds.
-  # These should be available in ESPHome 2026.3.0
-  - source:
-      # Dev commit hash for squash merge from PR#10212
-      type: git
-      url: https://github.com/esphome/esphome
-      ref: 903971de12c1b291ca8cd367ce5cdf9af8b304ae
-    components: [runtime_image]
-  - source:
-      # Dev commit hash for squash merge from PR#12258
-      type: git
-      url: https://github.com/esphome/esphome
-      ref: 264c8faedd0ab956b0437ec2ecc0bacae1708923
-    components: [media_player]
-  - source:
-      # Dev commit hash for squash merge from PR#14013
-      type: git
-      url: https://github.com/esphome/esphome
-      ref: ba7134ee3f870ce00d2990d84b142b734028330f
-    components: [mdns]
-  - source:
-      # Dev commit hash for squash merge from PR#14108
-      type: git
-      url: https://github.com/esphome/esphome
-      ref: d2026b4cd74bbeb9b86941bf1887f3d93d639387
-    components: [audio]
+    components: [http_request]
 
 globals:
   - id: sendspin_album_art_valid
@@ -117,7 +87,7 @@ globals:
 image:
   - file: https://raw.githubusercontent.com/RealDeco/xiaozhi-esphome/main/images/Gwen/240x240/playing.png
     id: fallback_playing_image
-    resize: 240x240
+    resize: 216x216
     type: RGB565
     dither: NONE
 
@@ -126,7 +96,7 @@ generic_image:
     id: sendspin_album_art
     format: jpg
     type: RGB565
-    resize: 240x240
+    resize: 216x216
     image_source: ALBUM
     on_image_decoded:
       - script.stop: album_art_timeout_fallback
@@ -141,6 +111,111 @@ generic_image:
       - lvgl.image.update:
           id: album_art_widget
           src: fallback_playing_image
+
+i2s_audio:
+  - id: i2s_audio_bus
+    i2s_lrclk_pin: GPIO4
+    i2s_bclk_pin: GPIO5
+
+speaker:
+  - platform: i2s_audio
+    id: box_speaker
+    i2s_audio_id: i2s_audio_bus
+    i2s_dout_pin: GPIO6
+    dac_type: external
+    channel: stereo
+
+  - platform: mixer
+    id: mixing_speaker
+    output_speaker: box_speaker
+    num_channels: 2
+    task_stack_in_psram: true
+    source_speakers:
+      - id: announcement_mixing_input
+      - id: media_mixing_input
+
+  - platform: resampler
+    id: announcement_resampling_speaker
+    output_speaker: announcement_mixing_input
+    sample_rate: 48000
+    bits_per_sample: 16
+
+  - platform: resampler
+    id: media_resampling_speaker
+    output_speaker: media_mixing_input
+    sample_rate: 48000
+
+sendspin:
+  id: sendspin_hub
+  task_stack_in_psram: false
+
+http_request:
+  buffer_size_rx: 2048  # Reduces CPU load when streaming audio
+
+audio_file:
+  - id: ready_sound
+    file: ${startup_sound_file}
+
+media_source:
+  - platform: audio_file
+    id: audio_file_announcement_source
+  - platform: http_request
+    id: http_announcement_source
+    buffer_size: 250000
+  - platform: http_request
+    id: http_media_source
+    buffer_size: 500000
+  - platform: sendspin
+    id: sendspin_media_source
+
+media_player:
+  - platform: sendspin
+    id: sendspin_group_media_player
+    name: Sendspin Group Media Player
+
+  - platform: speaker_source
+    id: external_media_player
+    name: Media Player
+
+    announcement_pipeline:
+      format: FLAC
+      num_channels: 1
+      sample_rate: 48000
+      speaker: announcement_resampling_speaker
+      sources:
+        - audio_file_announcement_source
+        - http_announcement_source
+
+    media_pipeline:
+      format: FLAC
+      num_channels: 2
+      sample_rate: 48000
+      speaker: media_resampling_speaker
+      sources:
+        - http_media_source
+        - sendspin_media_source
+    volume_increment: 0.05
+    volume_min: 0.4
+    volume_max: 0.85
+
+    on_play:
+      then:
+        - script.stop: mp_idle_debounce
+        - lvgl.page.show: sendspin_page
+        - script.execute: led_green
+
+    on_announcement:
+      then:
+        - script.execute: led_green
+
+    on_idle:
+      then:
+        - script.execute: mp_idle_debounce
+        - script.execute: led_red
+
+    on_pause:
+      then:
+        - script.execute: led_red
 
 sensor:
   - platform: homeassistant
@@ -222,14 +297,6 @@ text_sensor:
       }
       return s;
     on_value:
-      - lvgl.label.update: { id: now_playing_o_nw, text: !lambda return x; }
-      - lvgl.label.update: { id: now_playing_o_n,  text: !lambda return x; }
-      - lvgl.label.update: { id: now_playing_o_ne, text: !lambda return x; }
-      - lvgl.label.update: { id: now_playing_o_w,  text: !lambda return x; }
-      - lvgl.label.update: { id: now_playing_o_e,  text: !lambda return x; }
-      - lvgl.label.update: { id: now_playing_o_sw, text: !lambda return x; }
-      - lvgl.label.update: { id: now_playing_o_s,  text: !lambda return x; }
-      - lvgl.label.update: { id: now_playing_o_se, text: !lambda return x; }
       - lvgl.label.update:
           id: now_playing_label
           text: !lambda return x;
@@ -418,101 +485,6 @@ font:
       - "\U000F0598"
       - "\U000F0599"
 
-i2s_audio:
-  - id: i2s_audio_bus
-    i2s_lrclk_pin: GPIO4
-    i2s_bclk_pin: GPIO5
-
-speaker:
-  - platform: i2s_audio
-    id: box_speaker
-    i2s_audio_id: i2s_audio_bus
-    i2s_dout_pin: GPIO6
-    dac_type: external
-    channel: stereo
-
-  - platform: mixer
-    id: mixing_speaker
-    output_speaker: box_speaker
-    num_channels: 2
-    source_speakers:
-      - id: announcement_mixer_input
-      - id: media_mixer_input
-
-  - platform: resampler
-    id: media_resampling_input
-    output_speaker: media_mixer_input
-    sample_rate: 48000
-
-  - platform: resampler
-    id: announcement_resampling_input
-    output_speaker: announcement_mixer_input
-    sample_rate: 48000
-
-sendspin:
-  id: sendspin_hub
-  task_stack_in_psram: true
-  kalman_process_error: 0.01
-
-media_source:
-  - platform: sendspin
-    id: sendspin_source
-  - platform: http_request
-    id: http_source
-    buffer_size: 500000
-  - platform: file
-    id: file_source
-    files:
-      - id: ready_sound
-        file: ${startup_sound_file}
-
-media_player:
-  - platform: sendspin
-    id: sendspin_media
-    name: Sendspin Group Media Player
-
-  - platform: speaker_source
-    name: Sendspin Media Player
-    id: external_media_player
-    announcement_speaker: announcement_resampling_input
-    media_speaker: media_resampling_input
-
-    announcement_pipeline:
-      format: FLAC
-      num_channels: 1
-      sample_rate: 48000
-    media_pipeline:
-      format: FLAC
-      num_channels: 2
-      sample_rate: 48000
-
-    volume_increment: 0.05
-    volume_min: 0.5
-    volume_max: 0.8
-    sources:
-      - http_source
-      - sendspin_source
-      - file_source
-
-    on_play:
-      then:
-        - script.stop: mp_idle_debounce
-        - lvgl.page.show: sendspin_page
-        - script.execute: led_green
-
-    on_announcement:
-      then:
-        - script.execute: led_green
-
-    on_idle:
-      then:
-        - script.execute: mp_idle_debounce
-        - script.execute: led_red
-
-    on_pause:
-      then:
-        - script.execute: led_red
-
 script:
   - id: album_art_timeout_fallback
     mode: restart
@@ -525,6 +497,7 @@ script:
             - lvgl.image.update:
                 id: album_art_widget
                 src: fallback_playing_image
+
   - id: mp_idle_debounce
     mode: restart
     then:
@@ -536,6 +509,7 @@ script:
           then:
             - lvgl.page.show: idle_page
             - script.execute: led_red
+
   - id: play_sound
     parameters:
       priority: bool
@@ -546,8 +520,8 @@ script:
             lambda: 'return sound_file == "ready_sound";'
           then:
             - lambda: 'id(boot_announce_active) = true;'
-            - lvgl.page.show: boot_sound_page
             - delay: 2s
+            - lvgl.page.show: boot_sound_page
             - lambda: 'id(boot_announce_active) = false;'
 
       - if:
@@ -562,7 +536,7 @@ script:
           if ((id(external_media_player).state != media_player::MediaPlayerState::MEDIA_PLAYER_STATE_ANNOUNCING) || priority) {
             id(external_media_player)
               ->make_call()
-              .set_media_url("file://" + sound_file)
+              .set_media_url("audio-file://" + sound_file)
               .set_announcement(true)
               .perform();
           }
@@ -772,42 +746,22 @@ lvgl:
       widgets:
         - image:
             id: album_art_widget
-            align: CENTER
+            align: TOP_MID
             x: 0
             y: 0
             src: fallback_playing_image
-            width: 240
-            height: 240
+            width: 216
+            height: 216
             antialias: false
             clickable: false
 
-        - obj:
-            id: now_playing_container
+        - label:
+            id: now_playing_label
             align: BOTTOM_MID
-            y: -6
-            width: 240
-            height: 34
-            bg_opa: TRANSP
-            border_opa: TRANSP
-            border_width: 0
-            pad_all: 0
-            scrollbar_mode: "OFF"
-            clickable: false
-            widgets:
-              - label: { id: now_playing_o_nw, align: CENTER, x: -1, y: -1, width: 232, text: "", text_color: 0x000000, long_mode: SCROLL_CIRCULAR, text_align: CENTER }
-              - label: { id: now_playing_o_n,  align: CENTER, x:  0, y: -1, width: 232, text: "", text_color: 0x000000, long_mode: SCROLL_CIRCULAR, text_align: CENTER }
-              - label: { id: now_playing_o_ne, align: CENTER, x:  1, y: -1, width: 232, text: "", text_color: 0x000000, long_mode: SCROLL_CIRCULAR, text_align: CENTER }
-              - label: { id: now_playing_o_w,  align: CENTER, x: -1, y:  0, width: 232, text: "", text_color: 0x000000, long_mode: SCROLL_CIRCULAR, text_align: CENTER }
-              - label: { id: now_playing_o_e,  align: CENTER, x:  1, y:  0, width: 232, text: "", text_color: 0x000000, long_mode: SCROLL_CIRCULAR, text_align: CENTER }
-              - label: { id: now_playing_o_sw, align: CENTER, x: -1, y:  1, width: 232, text: "", text_color: 0x000000, long_mode: SCROLL_CIRCULAR, text_align: CENTER }
-              - label: { id: now_playing_o_s,  align: CENTER, x:  0, y:  1, width: 232, text: "", text_color: 0x000000, long_mode: SCROLL_CIRCULAR, text_align: CENTER }
-              - label: { id: now_playing_o_se, align: CENTER, x:  1, y:  1, width: 232, text: "", text_color: 0x000000, long_mode: SCROLL_CIRCULAR, text_align: CENTER }
+            y: -3
+            width: 232
+            text: ""
+            text_color: 0xFFFFFF
+            long_mode: SCROLL_CIRCULAR
+            text_align: CENTER
 
-              - label:
-                  id: now_playing_label
-                  align: CENTER
-                  width: 232
-                  text: ""
-                  text_color: 0xFFFFFF
-                  long_mode: SCROLL_CIRCULAR
-                  text_align: CENTER
