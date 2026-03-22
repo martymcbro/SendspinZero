@@ -144,6 +144,7 @@ speaker:
     id: media_resampling_speaker
     output_speaker: media_mixing_input
     sample_rate: 48000
+    bits_per_sample: 16
 
 sendspin:
   id: sendspin_hub
