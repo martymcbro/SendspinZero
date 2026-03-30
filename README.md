@@ -8,6 +8,10 @@ A tiny Sendspin media player with **cover art display** and a **weather clock**,
 
 This project turns a small, inexpensive ESP32 board into a compact **audio receiver** for your amplifier, with a screen for album art, Song, Artist, and a weather clock when not playing.
 
+Each version could be made with either a Display, No Display, or a Big Button. this totals 9 variants:
+
+<img width="1348" height="653" alt="ff08444c-edad-47c3-bce7-56dd34dd00ec" src="https://github.com/user-attachments/assets/e5c695af-840a-4180-949f-62e7d3e10bb6" />
+
 ---
 
 ## About the Project
@@ -32,7 +36,6 @@ So I:
   <img src="https://github.com/user-attachments/assets/d5c4868f-853d-4685-beb3-79a2a368fe85" width="45%" />
   <img src="https://github.com/user-attachments/assets/234270a5-7343-45c7-a838-e55080f99edb" width="45%" />
 </p>
-
 
 ---
 
@@ -98,10 +101,11 @@ All parts were sourced from AliExpress and added up to **just over $10** the las
 
 ---
 
-## Added Toslink (optical audio) version.
+## Toslink (optical audio) version.
 
 Toslink version without display, this is about the easiest project to make! and for under §10 :)
 
+(for using with display or button, the pins are the same for those)
 
 <img width="2544" height="1211" alt="Screenshot 2026-03-07 at 06 19 25" src="https://github.com/user-attachments/assets/f600ec5b-6d98-4597-b9a6-dfba106eeef2" />
 
@@ -120,7 +124,6 @@ Your Soundbar will love you for it ;) - 3D files for case is in [3D_Files](3D_Fi
 Pins on this specific toslink plug:
 <img width="1741" height="774" alt="Screenshot 2026-03-08 at 08 25 18" src="https://github.com/user-attachments/assets/708cf545-3853-44d9-be97-c54bd7d5a25a" />
 
-
 ---
 
 Links to parts, esp32-s3 zero is same as above, toslink connector that fits the 3D case:
@@ -136,10 +139,64 @@ and 1 M2.6x10 self tapping screw to hold the toslink plug in place
 !IMPORTANT: remember to choose "Transmitting end" (A1)
 
 ---
-Optionally it's possible to use Coax SPDIF output instead of Toslink. - One cord less + one resister (330-470ohm). 3D files for case with and without display in 3D Files.
 
+## Coax (digital audio) version.
+
+Coax version without display, this is about the easiest project of them all, just two cords and a resistor
+
+(for using with display or button, the pins are the same for those)
 
 <img width="1000" height="459" alt="Image" src="https://github.com/user-attachments/assets/0daa8227-f093-4db7-932d-d1da08eeb516" />
 
+3D files for case is in [3D_Files](3D_Files)
+
+## Pin Mapping
+
+### ESP32-S3 → toslink connector
+
+| ESP32-S3 GPIO | RCA PLUG     |
+| ------------- | ------------ |
+| GPIO4         | VIN (DATA)   |
+| GND           | GND          |
 ---
 
+Links to parts, esp32-s3 zero is same as above:
+
+RCA female: https://www.aliexpress.com/item/1005010424983352.html
+
+Cords: https://www.aliexpress.com/item/1005008202856228.html
+
+---
+
+## Button
+
+Instead of display or no display, there's now a 3rd option, a big nice button with light :)
+(
+
+![button-led](https://github.com/user-attachments/assets/58495e54-4e8d-465a-86ac-04d2dd644c3c)
+
+3D files for case is in [3D_Files](3D_Files)
+
+## Pin Mapping
+
+### ESP32-S3 → Button (22mm 2 color)
+
+| ESP32-S3 GPIO | BUTTON       |
+| ------------- | ------------ |
+| GPIO1         | 1            |
+| GPIO2         | 3            |
+| GPIO3         | 4            |
+| GND           | 2 + 5        |
+
+---
+
+<img width="549" height="594" alt="Screenshot 2026-03-30 at 20 38 24" src="https://github.com/user-attachments/assets/43835fa0-46af-49d7-95a4-fb2c2d7c3063" />
+Links to part:
+
+This low profile button is a little expensive but also VERY nice :)
+
+Inportant to select the correct size, and voltage:
+
+22mm Bicolor (RG) Black 3-6V : https://www.aliexpress.com/item/1005004920346156.html
+
+---
