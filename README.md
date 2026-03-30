@@ -168,10 +168,9 @@ Cords: https://www.aliexpress.com/item/1005008202856228.html
 
 ---
 
-## Button
+## Button!
 
 Instead of display or no display, there's now a 3rd option, a big nice button with light :)
-(
 
 ![button-led](https://github.com/user-attachments/assets/58495e54-4e8d-465a-86ac-04d2dd644c3c)
 
