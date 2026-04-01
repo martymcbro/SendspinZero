@@ -361,6 +361,11 @@ text_sensor:
     update_interval: 15s
     lambda: |-
       if (!id(ha_weather_temperature).has_state()) return std::string("--");
+
+      std::string tunit = id(ha_weather_temperature_unit).state.c_str();
+      if (tunit.empty()) tunit = "°C";
+      lv_label_set_text(id(weather_big_temp_unit), tunit.c_str());
+
       int ti = (int) lroundf(id(ha_weather_temperature).state);
       char buf[8];
       snprintf(buf, sizeof(buf), "%d", ti);
@@ -475,7 +480,7 @@ font:
       weight: 700
     id: font_temp_unit
     size: 22
-    glyphs: "°C"
+    glyphs: "°CF"
 
   - file: https://raw.githubusercontent.com/rbtdev/spiroplot/master/fonts/DSEG7/Classic-MINI/DSEG7ClassicMini-Bold.ttf
     id: font_7seg
