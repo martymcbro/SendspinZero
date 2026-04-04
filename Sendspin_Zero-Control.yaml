@@ -1,6 +1,6 @@
 substitutions:
   name: esphome-web-e83240
-  friendly_name: Sensspin Zero Control
+  friendly_name: Sendspin Zero Control
 
 ## SETTINGS ######################################################################################################################################
 
