@@ -55,6 +55,8 @@ All parts were sourced from AliExpress and added up to **just over $10** (last c
 * **1 × ESP32-S3 Zero**
   [https://www.aliexpress.com/item/1005009890203011.html](https://www.aliexpress.com/item/1005009890203011.html)
 
+  (be sure you select esp32-s3, not esp32-c3 which the page defaults to.)
+
 * **1 × PCM5102A DAC**
   [https://www.aliexpress.com/item/1005008130629022.html](https://www.aliexpress.com/item/1005008130629022.html)
 
