@@ -28,10 +28,40 @@ substitutions:
   # Home Assistant button entity triggered by normal-button triple click.
   favorite_button_entity: button.sensspin_zero_control_favorite_current_song
 
+  # Home Assistant Media Player entity for playing streams (e.g. via Music Assistant)
+  ha_media_player_entity: media_player.sensspin_zero_control
 
-  # Rotating the display, uncomment the block you need (default 0 degree)
+  # Media Menu Items Configuration
+  media_item_count: "10" # Increase this when adding more items below (max 10)
 
-  # 0 degree
+  # Media links and names for menu
+  media_name_1: "Random 500"
+  media_url_1: "library://playlist/45"
+  media_name_2: "Neil Diamond"
+  media_url_2: "library://playlist/72"
+  media_name_3: "Tommy Steele"
+  media_url_3: "library://playlist/68"
+  media_name_4: "Radio: P5"
+  media_url_4: "http://live-icy.gss.dr.dk:8000/A/A25L.mp3"
+  media_name_5: "Radio: Boost"
+  media_url_5: "http://6434.cloudrad.io:8066/live"
+  media_name_6: "Radio: Smooth Chill"
+  media_url_6: "https://ice-sov.musicradio.com/SmoothChillMP3"
+
+  # Available slots for future expansion (up to 10)
+  media_name_7: "Unused 7"
+  media_url_7: "unused"
+  media_name_8: "Unused 8"
+  media_url_8: "unused"
+  media_name_9: "Unused 9"
+  media_url_9: "unused"
+  media_name_10: "Unused 10"
+  media_url_10: "unused"
+
+
+## ROTATIO: THIS PART IS ONLY NEEDED IF YOU TURNED DISPLAY AROUND IN CASE ########################################################################
+
+  # 0 degree (default)
   display_swap_xy: "false"
   display_mirror_x: "false"
   display_mirror_y: "false"
@@ -45,23 +75,15 @@ substitutions:
   # display_offset_width: "0"
   # display_offset_height: "80"
 
-packages: # uncomment the one you use (analog for normal jack, digital for coax or toslink spdif)
+## END OF SETTINGS ###############################################################################################################################
 
+packages:
   hw: #ANALOG
     url: https://github.com/RealDeco/SendspinZero.git
     ref: main
     refresh: 0s
     files:
       - analog_speaker_config.yaml
-
-#  hw: #DIGITAL
-#    url: https://github.com/RealDeco/SendspinZero.git
-#    ref: main
-#    refresh: 0s
-#    files:
-#      - digital_speaker_config.yaml
-
-##################################################################################################################################################
 
 esphome:
   name: ${name}
@@ -145,11 +167,6 @@ globals:
     restore_value: no
     initial_value: "false"
 
-  - id: forecast_available
-    type: bool
-    restore_value: no
-    initial_value: "false"
-
   - id: knob_popup_active
     type: bool
     restore_value: no
@@ -192,6 +209,21 @@ globals:
     initial_value: "1"
 
   - id: control_menu_turn_halfstep
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+  - id: media_menu_active
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+  - id: media_menu_cursor
+    type: int
+    restore_value: no
+    initial_value: "1"
+
+  - id: media_menu_turn_halfstep
     type: bool
     restore_value: no
     initial_value: "false"
@@ -280,6 +312,7 @@ media_player:
     on_play:
       then:
         - script.stop: mp_idle_debounce
+        - script.execute: hide_media_menu
         - lvgl.page.show: sendspin_page
         - if:
             condition:
@@ -346,7 +379,7 @@ text_sensor:
     on_value:
       - lambda: |-
           const char* icon = "\U000F0590";
-          auto c = id(ha_weather_condition).state;
+          auto c = x;
 
           if (c == "sunny" || c == "clear") {
             icon = "\U000F0599";
@@ -743,7 +776,6 @@ script:
 
                 JsonArrayConst forecast = response["response"]["${ha_weather_entity}"]["forecast"].as<JsonArrayConst>();
                 if (forecast.isNull() || forecast.size() == 0) {
-                  id(forecast_available) = false;
                   lv_obj_add_flag(id(forecast_strip), LV_OBJ_FLAG_HIDDEN);
                   ESP_LOGW("forecast", "No daily forecast data returned for ${ha_weather_entity}");
                   return;
@@ -805,7 +837,6 @@ script:
                   }
                 }
 
-                id(forecast_available) = rendered_any;
                 if (rendered_any) {
                   lv_obj_clear_flag(id(forecast_strip), LV_OBJ_FLAG_HIDDEN);
                 } else {
@@ -813,7 +844,6 @@ script:
                 }
           on_error:
             - lambda: |-
-                id(forecast_available) = false;
                 lv_obj_add_flag(id(forecast_strip), LV_OBJ_FLAG_HIDDEN);
                 ESP_LOGW("forecast", "weather.get_forecasts failed for ${ha_weather_entity}");
 
@@ -822,88 +852,148 @@ script:
     then:
       - if:
           condition:
-            lambda: 'return id(control_menu_active);'
+            lambda: 'return id(media_menu_active);'
           then:
             - lambda: |-
-                if (id(control_menu_turn_halfstep)) {
-                  id(control_menu_cursor) -= 1;
-                  if (id(control_menu_cursor) < 1) id(control_menu_cursor) = 6;
+                int max_items = atoi("${media_item_count}");
+                if (max_items < 1) max_items = 1;
+                if (max_items > 10) max_items = 10;
+                if (id(media_menu_cursor) < 1 || id(media_menu_cursor) > max_items) {
+                  id(media_menu_cursor) = 1;
                 }
-                id(control_menu_turn_halfstep) = !id(control_menu_turn_halfstep);
-            - script.execute: render_control_menu
+
+                if (id(media_menu_turn_halfstep)) {
+                  if (id(menu_scroll_direction_switch).state) {
+                    id(media_menu_cursor) += 1;
+                    if (id(media_menu_cursor) > max_items) id(media_menu_cursor) = 1;
+                  } else {
+                    id(media_menu_cursor) -= 1;
+                    if (id(media_menu_cursor) < 1) id(media_menu_cursor) = max_items;
+                  }
+                }
+                id(media_menu_turn_halfstep) = !id(media_menu_turn_halfstep);
+            - script.execute: render_media_menu
           else:
             - if:
                 condition:
-                  lambda: 'return id(knob_popup_active);'
+                  lambda: 'return id(control_menu_active);'
                 then:
                   - lambda: |-
-                      id(knob_control_pct) += 5;
-                      if (id(knob_control_pct) > 100) id(knob_control_pct) = 100;
-                      id(popup_mode_light) = true;
-                  - script.execute: update_popup_widgets
-                  - script.execute: apply_knob_to_light
-                else:
-                  - lambda: |-
-                      const bool popup_visible =
-                        (!lv_obj_has_flag(id(popup_idle), LV_OBJ_FLAG_HIDDEN)) ||
-                        (!lv_obj_has_flag(id(popup_sendspin), LV_OBJ_FLAG_HIDDEN));
-                      if (popup_visible) {
-                        // Keep using the local step counter while the volume popup is active.
-                      } else {
-                        id(volume_control_pct) = (int) lroundf(id(external_media_player).volume * 100.0f / 0.90f);
+                      if (id(control_menu_turn_halfstep)) {
+                        if (id(menu_scroll_direction_switch).state) {
+                          id(control_menu_cursor) += 1;
+                          if (id(control_menu_cursor) > 6) id(control_menu_cursor) = 1;
+                        } else {
+                          id(control_menu_cursor) -= 1;
+                          if (id(control_menu_cursor) < 1) id(control_menu_cursor) = 6;
+                        }
                       }
-                      id(volume_control_pct) += 5;
-                      if (id(volume_control_pct) > 100) id(volume_control_pct) = 100;
-                      id(popup_mode_light) = false;
-                  - media_player.volume_set:
-                      id: external_media_player
-                      volume: !lambda 'return id(volume_control_pct) * 0.009f;'
-                  - script.execute: show_volume_popup
-                  - script.execute: popup_autoclose
+                      id(control_menu_turn_halfstep) = !id(control_menu_turn_halfstep);
+                  - script.execute: render_control_menu
+                else:
+                  - if:
+                      condition:
+                        lambda: 'return id(knob_popup_active);'
+                      then:
+                        - lambda: |-
+                            id(knob_control_pct) += 5;
+                            if (id(knob_control_pct) > 100) id(knob_control_pct) = 100;
+                            id(popup_mode_light) = true;
+                        - script.execute: update_popup_widgets
+                        - script.execute: apply_knob_to_light
+                        - script.execute: popup_autoclose
+                      else:
+                        - lambda: |-
+                            const bool popup_visible =
+                              (!lv_obj_has_flag(id(popup_idle), LV_OBJ_FLAG_HIDDEN)) ||
+                              (!lv_obj_has_flag(id(popup_sendspin), LV_OBJ_FLAG_HIDDEN));
+                            if (popup_visible) {
+                              // Keep using the local step counter while the volume popup is active.
+                            } else {
+                              id(volume_control_pct) = (int) lroundf(id(external_media_player).volume * 100.0f / 0.90f);
+                            }
+                            id(volume_control_pct) += 5;
+                            if (id(volume_control_pct) > 100) id(volume_control_pct) = 100;
+                            id(popup_mode_light) = false;
+                        - media_player.volume_set:
+                            id: external_media_player
+                            volume: !lambda 'return id(volume_control_pct) * 0.009f;'
+                        - script.execute: show_volume_popup
+                        - script.execute: popup_autoclose
 
   - id: rotary_ccw
     mode: restart
     then:
       - if:
           condition:
-            lambda: 'return id(control_menu_active);'
+            lambda: 'return id(media_menu_active);'
           then:
             - lambda: |-
-                if (id(control_menu_turn_halfstep)) {
-                  id(control_menu_cursor) += 1;
-                  if (id(control_menu_cursor) > 6) id(control_menu_cursor) = 1;
+                int max_items = atoi("${media_item_count}");
+                if (max_items < 1) max_items = 1;
+                if (max_items > 10) max_items = 10;
+                if (id(media_menu_cursor) < 1 || id(media_menu_cursor) > max_items) {
+                  id(media_menu_cursor) = 1;
                 }
-                id(control_menu_turn_halfstep) = !id(control_menu_turn_halfstep);
-            - script.execute: render_control_menu
+
+                if (id(media_menu_turn_halfstep)) {
+                  if (id(menu_scroll_direction_switch).state) {
+                    id(media_menu_cursor) -= 1;
+                    if (id(media_menu_cursor) < 1) id(media_menu_cursor) = max_items;
+                  } else {
+                    id(media_menu_cursor) += 1;
+                    if (id(media_menu_cursor) > max_items) id(media_menu_cursor) = 1;
+                  }
+                }
+                id(media_menu_turn_halfstep) = !id(media_menu_turn_halfstep);
+            - script.execute: render_media_menu
           else:
             - if:
                 condition:
-                  lambda: 'return id(knob_popup_active);'
+                  lambda: 'return id(control_menu_active);'
                 then:
                   - lambda: |-
-                      id(knob_control_pct) -= 5;
-                      if (id(knob_control_pct) < 0) id(knob_control_pct) = 0;
-                      id(popup_mode_light) = true;
-                  - script.execute: update_popup_widgets
-                  - script.execute: apply_knob_to_light
-                else:
-                  - lambda: |-
-                      const bool popup_visible =
-                        (!lv_obj_has_flag(id(popup_idle), LV_OBJ_FLAG_HIDDEN)) ||
-                        (!lv_obj_has_flag(id(popup_sendspin), LV_OBJ_FLAG_HIDDEN));
-                      if (popup_visible) {
-                        // Keep using the local step counter while the volume popup is active.
-                      } else {
-                        id(volume_control_pct) = (int) lroundf(id(external_media_player).volume * 100.0f / 0.90f);
+                      if (id(control_menu_turn_halfstep)) {
+                        if (id(menu_scroll_direction_switch).state) {
+                          id(control_menu_cursor) -= 1;
+                          if (id(control_menu_cursor) < 1) id(control_menu_cursor) = 6;
+                        } else {
+                          id(control_menu_cursor) += 1;
+                          if (id(control_menu_cursor) > 6) id(control_menu_cursor) = 1;
+                        }
                       }
-                      id(volume_control_pct) -= 5;
-                      if (id(volume_control_pct) < 0) id(volume_control_pct) = 0;
-                      id(popup_mode_light) = false;
-                  - media_player.volume_set:
-                      id: external_media_player
-                      volume: !lambda 'return id(volume_control_pct) * 0.009f;'
-                  - script.execute: show_volume_popup
-                  - script.execute: popup_autoclose
+                      id(control_menu_turn_halfstep) = !id(control_menu_turn_halfstep);
+                  - script.execute: render_control_menu
+                else:
+                  - if:
+                      condition:
+                        lambda: 'return id(knob_popup_active);'
+                      then:
+                        - lambda: |-
+                            id(knob_control_pct) -= 5;
+                            if (id(knob_control_pct) < 0) id(knob_control_pct) = 0;
+                            id(popup_mode_light) = true;
+                        - script.execute: update_popup_widgets
+                        - script.execute: apply_knob_to_light
+                        - script.execute: popup_autoclose
+                      else:
+                        - lambda: |-
+                            const bool popup_visible =
+                              (!lv_obj_has_flag(id(popup_idle), LV_OBJ_FLAG_HIDDEN)) ||
+                              (!lv_obj_has_flag(id(popup_sendspin), LV_OBJ_FLAG_HIDDEN));
+                            if (popup_visible) {
+                              // Keep using the local step counter while the volume popup is active.
+                            } else {
+                              id(volume_control_pct) = (int) lroundf(id(external_media_player).volume * 100.0f / 0.90f);
+                            }
+                            id(volume_control_pct) -= 5;
+                            if (id(volume_control_pct) < 0) id(volume_control_pct) = 0;
+                            id(popup_mode_light) = false;
+                        - media_player.volume_set:
+                            id: external_media_player
+                            volume: !lambda 'return id(volume_control_pct) * 0.009f;'
+                        - script.execute: show_volume_popup
+                        - script.execute: popup_autoclose
 
   - id: album_art_timeout_fallback
     mode: restart
@@ -1048,6 +1138,7 @@ script:
             id(knob_control_pct) = 0;
           }
       - script.execute: render_popup
+      - script.execute: popup_autoclose
 
   - id: show_volume_popup
     mode: restart
@@ -1115,12 +1206,27 @@ script:
           for (int i = 0; i < 6; i++) {
             const bool selected = ((i + 1) == id(control_menu_cursor));
             char item_text[64];
-            snprintf(item_text, sizeof(item_text), "%s%s", selected ? "> " : "  ", labels[i]);
+            snprintf(item_text, sizeof(item_text), "  %s", labels[i]);
             lv_label_set_text(idle_items[i], item_text);
             lv_label_set_text(sendspin_items[i], item_text);
-            lv_color_t item_color = lv_color_hex(selected ? 0x66CCFF : 0xFFFFFF);
-            lv_obj_set_style_text_color(idle_items[i], item_color, LV_PART_MAIN);
-            lv_obj_set_style_text_color(sendspin_items[i], item_color, LV_PART_MAIN);
+            
+            if (selected) {
+              lv_obj_set_style_bg_color(idle_items[i], lv_color_hex(0x66CCFF), LV_PART_MAIN);
+              lv_obj_set_style_bg_opa(idle_items[i], LV_OPA_COVER, LV_PART_MAIN);
+              lv_obj_set_style_text_color(idle_items[i], lv_color_hex(0x000000), LV_PART_MAIN);
+              lv_obj_set_style_radius(idle_items[i], 6, LV_PART_MAIN);
+              
+              lv_obj_set_style_bg_color(sendspin_items[i], lv_color_hex(0x66CCFF), LV_PART_MAIN);
+              lv_obj_set_style_bg_opa(sendspin_items[i], LV_OPA_COVER, LV_PART_MAIN);
+              lv_obj_set_style_text_color(sendspin_items[i], lv_color_hex(0x000000), LV_PART_MAIN);
+              lv_obj_set_style_radius(sendspin_items[i], 6, LV_PART_MAIN);
+            } else {
+              lv_obj_set_style_bg_opa(idle_items[i], LV_OPA_TRANSP, LV_PART_MAIN);
+              lv_obj_set_style_text_color(idle_items[i], lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+              
+              lv_obj_set_style_bg_opa(sendspin_items[i], LV_OPA_TRANSP, LV_PART_MAIN);
+              lv_obj_set_style_text_color(sendspin_items[i], lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+            }
           }
       - if:
           condition:
@@ -1166,11 +1272,135 @@ script:
       - lambda: |-
           id(selected_control_index) = id(control_menu_cursor);
       - script.execute: hide_control_menu
+      - script.execute: show_selected_control_popup
+
+  - id: render_media_menu
+    mode: restart
+    then:
+      - lambda: |-
+          int count = atoi("${media_item_count}");
+          if (count < 1) count = 1;
+          if (count > 10) count = 10;
+          if (id(media_menu_cursor) < 1 || id(media_menu_cursor) > count) {
+            id(media_menu_cursor) = 1;
+          }
+          const char *labels[10] = {
+            "${media_name_1}", "${media_name_2}", "${media_name_3}", "${media_name_4}", "${media_name_5}",
+            "${media_name_6}", "${media_name_7}", "${media_name_8}", "${media_name_9}", "${media_name_10}"
+          };
+          lv_obj_t *idle_items[10] = {
+            id(media_menu_idle_item_1), id(media_menu_idle_item_2), id(media_menu_idle_item_3),
+            id(media_menu_idle_item_4), id(media_menu_idle_item_5), id(media_menu_idle_item_6),
+            id(media_menu_idle_item_7), id(media_menu_idle_item_8), id(media_menu_idle_item_9),
+            id(media_menu_idle_item_10)
+          };
+          lv_obj_t *sendspin_items[10] = {
+            id(media_menu_sendspin_item_1), id(media_menu_sendspin_item_2), id(media_menu_sendspin_item_3),
+            id(media_menu_sendspin_item_4), id(media_menu_sendspin_item_5), id(media_menu_sendspin_item_6),
+            id(media_menu_sendspin_item_7), id(media_menu_sendspin_item_8), id(media_menu_sendspin_item_9),
+            id(media_menu_sendspin_item_10)
+          };
+
+          for (int i = 0; i < 10; i++) {
+            if (i < count) {
+              lv_obj_clear_flag(idle_items[i], LV_OBJ_FLAG_HIDDEN);
+              lv_obj_clear_flag(sendspin_items[i], LV_OBJ_FLAG_HIDDEN);
+              const bool selected = ((i + 1) == id(media_menu_cursor));
+              char item_text[64];
+              snprintf(item_text, sizeof(item_text), "  %s", labels[i]);
+              lv_label_set_text(idle_items[i], item_text);
+              lv_label_set_text(sendspin_items[i], item_text);
+              
+              if (selected) {
+                lv_obj_set_style_bg_color(idle_items[i], lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+                lv_obj_set_style_bg_opa(idle_items[i], LV_OPA_COVER, LV_PART_MAIN);
+                lv_obj_set_style_text_color(idle_items[i], lv_color_hex(0x000000), LV_PART_MAIN);
+                lv_obj_set_style_radius(idle_items[i], 6, LV_PART_MAIN);
+                lv_obj_set_style_bg_color(sendspin_items[i], lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+                lv_obj_set_style_bg_opa(sendspin_items[i], LV_OPA_COVER, LV_PART_MAIN);
+                lv_obj_set_style_text_color(sendspin_items[i], lv_color_hex(0x000000), LV_PART_MAIN);
+                lv_obj_set_style_radius(sendspin_items[i], 6, LV_PART_MAIN);
+                // scroll to ensure selected item is visible
+                lv_obj_scroll_to_view(idle_items[i], LV_ANIM_ON);
+                lv_obj_scroll_to_view(sendspin_items[i], LV_ANIM_ON);
+              } else {
+                lv_obj_set_style_bg_opa(idle_items[i], LV_OPA_TRANSP, LV_PART_MAIN);
+                lv_obj_set_style_text_color(idle_items[i], lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+                lv_obj_set_style_bg_opa(sendspin_items[i], LV_OPA_TRANSP, LV_PART_MAIN);
+                lv_obj_set_style_text_color(sendspin_items[i], lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+              }
+            } else {
+              lv_obj_add_flag(idle_items[i], LV_OBJ_FLAG_HIDDEN);
+              lv_obj_add_flag(sendspin_items[i], LV_OBJ_FLAG_HIDDEN);
+            }
+          }
       - if:
           condition:
-            lambda: 'return id(control_menu_restore_popup);'
+            lvgl.page.is_showing: idle_page
           then:
-            - script.execute: show_selected_control_popup
+            - lvgl.widget.show: media_menu_idle
+            - lvgl.widget.hide: media_menu_sendspin
+          else:
+            - if:
+                condition:
+                  lvgl.page.is_showing: sendspin_page
+                then:
+                  - lvgl.widget.show: media_menu_sendspin
+                  - lvgl.widget.hide: media_menu_idle
+
+  - id: hide_media_menu
+    mode: restart
+    then:
+      - lambda: |-
+          id(media_menu_active) = false;
+          lv_obj_scroll_to_y(id(media_menu_idle), 0, LV_ANIM_OFF);
+          lv_obj_scroll_to_y(id(media_menu_sendspin), 0, LV_ANIM_OFF);
+      - lvgl.widget.hide: media_menu_idle
+      - lvgl.widget.hide: media_menu_sendspin
+
+  - id: show_media_menu
+    mode: restart
+    then:
+      - if:
+          condition:
+            lambda: 'return id(control_menu_active) || (!lv_obj_has_flag(id(popup_idle), LV_OBJ_FLAG_HIDDEN)) || (!lv_obj_has_flag(id(popup_sendspin), LV_OBJ_FLAG_HIDDEN));'
+          then:
+            - delay: 0s
+          else:
+            - lambda: |-
+                id(media_menu_active) = true;
+                id(media_menu_cursor) = 1;
+                id(media_menu_turn_halfstep) = false;
+                lv_obj_scroll_to_y(id(media_menu_idle), 0, LV_ANIM_OFF);
+                lv_obj_scroll_to_y(id(media_menu_sendspin), 0, LV_ANIM_OFF);
+            - script.execute: hide_popup
+            - script.execute: render_media_menu
+
+  - id: select_media_menu_item
+    mode: restart
+    then:
+      - homeassistant.action:
+          action: media_player.play_media
+          data:
+            entity_id: ${ha_media_player_entity}
+            media_content_type: music
+          data_template:
+            media_content_id: "{{ media_url }}"
+          variables:
+            media_url: |-
+              int cursor = id(media_menu_cursor);
+              if (cursor == 1) return std::string("${media_url_1}");
+              if (cursor == 2) return std::string("${media_url_2}");
+              if (cursor == 3) return std::string("${media_url_3}");
+              if (cursor == 4) return std::string("${media_url_4}");
+              if (cursor == 5) return std::string("${media_url_5}");
+              if (cursor == 6) return std::string("${media_url_6}");
+              if (cursor == 7) return std::string("${media_url_7}");
+              if (cursor == 8) return std::string("${media_url_8}");
+              if (cursor == 9) return std::string("${media_url_9}");
+              if (cursor == 10) return std::string("${media_url_10}");
+              return std::string("");
+      - script.execute: hide_media_menu
 
   - id: apply_knob_to_light
     mode: restart
@@ -1388,6 +1618,14 @@ switch:
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
 
+  - platform: template
+    id: menu_scroll_direction_switch
+    name: Invert Menu Scroll
+    icon: "mdi:swap-vertical"
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+
 output:
   - platform: ledc
     pin: GPIO11
@@ -1464,6 +1702,7 @@ lvgl:
 
     - id: idle_page
       bg_color: 0x000000
+      scrollable: false
       widgets:
         - obj:
             id: idle_center_block
@@ -1758,7 +1997,7 @@ lvgl:
                   align: TOP_LEFT
                   y: 38
                   width: 196
-                  text: "> ${control_devicename_1}"
+                  text: "  ${control_devicename_1}"
                   text_color: 0x66CCFF
 
               - label:
@@ -1801,8 +2040,115 @@ lvgl:
                   text: "  ${control_devicename_6}"
                   text_color: 0xFFFFFF
 
+        - obj:
+            id: media_menu_idle
+            hidden: true
+            align: CENTER
+            width: 220
+            height: 290
+            radius: 18
+            pad_top: 12
+            pad_bottom: 12
+            pad_left: 12
+            pad_right: 12
+            scrollable: true
+            scrollbar_mode: ACTIVE
+            bg_color: 0x202020
+            bg_opa: COVER
+            border_color: 0xFFFF00
+            border_width: 2
+            widgets:
+              - label:
+                  align: TOP_MID
+                  y: 0
+                  width: 196
+                  text: "Select Music"
+                  text_color: 0xFFFF00
+                  text_align: CENTER
+
+              - label:
+                  id: media_menu_idle_item_1
+                  align: TOP_LEFT
+                  y: 38
+                  width: 196
+                  text: "  ${media_name_1}"
+                  text_color: 0xFFFF00
+
+              - label:
+                  id: media_menu_idle_item_2
+                  align: TOP_LEFT
+                  y: 66
+                  width: 196
+                  text: "  ${media_name_2}"
+                  text_color: 0xFFFFFF
+
+              - label:
+                  id: media_menu_idle_item_3
+                  align: TOP_LEFT
+                  y: 94
+                  width: 196
+                  text: "  ${media_name_3}"
+                  text_color: 0xFFFFFF
+
+              - label:
+                  id: media_menu_idle_item_4
+                  align: TOP_LEFT
+                  y: 122
+                  width: 196
+                  text: "  ${media_name_4}"
+                  text_color: 0xFFFFFF
+
+              - label:
+                  id: media_menu_idle_item_5
+                  align: TOP_LEFT
+                  y: 150
+                  width: 196
+                  text: "  ${media_name_5}"
+                  text_color: 0xFFFFFF
+
+              - label:
+                  id: media_menu_idle_item_6
+                  align: TOP_LEFT
+                  y: 178
+                  width: 196
+                  text: "  ${media_name_6}"
+                  text_color: 0xFFFFFF
+
+              - label:
+                  id: media_menu_idle_item_7
+                  align: TOP_LEFT
+                  y: 206
+                  width: 196
+                  text: "  ${media_name_7}"
+                  text_color: 0xFFFFFF
+
+              - label:
+                  id: media_menu_idle_item_8
+                  align: TOP_LEFT
+                  y: 234
+                  width: 196
+                  text: "  ${media_name_8}"
+                  text_color: 0xFFFFFF
+
+              - label:
+                  id: media_menu_idle_item_9
+                  align: TOP_LEFT
+                  y: 262
+                  width: 196
+                  text: "  ${media_name_9}"
+                  text_color: 0xFFFFFF
+
+              - label:
+                  id: media_menu_idle_item_10
+                  align: TOP_LEFT
+                  y: 290
+                  width: 196
+                  text: "  ${media_name_10}"
+                  text_color: 0xFFFFFF
+
     - id: sendspin_page
       bg_color: 0x000000
+      scrollable: false
       widgets:
         - image:
             id: album_art_widget
@@ -1820,9 +2166,10 @@ lvgl:
             align: TOP_MID
             y: 224
             width: 232
+            height: 24
             text: ""
             text_color: 0xFFFFFF
-            long_mode: SCROLL_CIRCULAR
+            long_mode: CLIP
             text_align: CENTER
 
         - label:
@@ -1918,7 +2265,7 @@ lvgl:
                   align: TOP_LEFT
                   y: 38
                   width: 196
-                  text: "> ${control_devicename_1}"
+                  text: "  ${control_devicename_1}"
                   text_color: 0x66CCFF
 
               - label:
@@ -1961,6 +2308,112 @@ lvgl:
                   text: "  ${control_devicename_6}"
                   text_color: 0xFFFFFF
 
+        - obj:
+            id: media_menu_sendspin
+            hidden: true
+            align: CENTER
+            width: 220
+            height: 290
+            radius: 18
+            pad_top: 12
+            pad_bottom: 12
+            pad_left: 12
+            pad_right: 12
+            scrollable: true
+            scrollbar_mode: ACTIVE
+            bg_color: 0x202020
+            bg_opa: COVER
+            border_color: 0xFFFF00
+            border_width: 2
+            widgets:
+              - label:
+                  align: TOP_MID
+                  y: 0
+                  width: 196
+                  text: "Select Music"
+                  text_color: 0xFFFF00
+                  text_align: CENTER
+
+              - label:
+                  id: media_menu_sendspin_item_1
+                  align: TOP_LEFT
+                  y: 38
+                  width: 196
+                  text: "  ${media_name_1}"
+                  text_color: 0xFFFF00
+
+              - label:
+                  id: media_menu_sendspin_item_2
+                  align: TOP_LEFT
+                  y: 66
+                  width: 196
+                  text: "  ${media_name_2}"
+                  text_color: 0xFFFFFF
+
+              - label:
+                  id: media_menu_sendspin_item_3
+                  align: TOP_LEFT
+                  y: 94
+                  width: 196
+                  text: "  ${media_name_3}"
+                  text_color: 0xFFFFFF
+
+              - label:
+                  id: media_menu_sendspin_item_4
+                  align: TOP_LEFT
+                  y: 122
+                  width: 196
+                  text: "  ${media_name_4}"
+                  text_color: 0xFFFFFF
+
+              - label:
+                  id: media_menu_sendspin_item_5
+                  align: TOP_LEFT
+                  y: 150
+                  width: 196
+                  text: "  ${media_name_5}"
+                  text_color: 0xFFFFFF
+
+              - label:
+                  id: media_menu_sendspin_item_6
+                  align: TOP_LEFT
+                  y: 178
+                  width: 196
+                  text: "  ${media_name_6}"
+                  text_color: 0xFFFFFF
+
+              - label:
+                  id: media_menu_sendspin_item_7
+                  align: TOP_LEFT
+                  y: 206
+                  width: 196
+                  text: "  ${media_name_7}"
+                  text_color: 0xFFFFFF
+
+              - label:
+                  id: media_menu_sendspin_item_8
+                  align: TOP_LEFT
+                  y: 234
+                  width: 196
+                  text: "  ${media_name_8}"
+                  text_color: 0xFFFFFF
+
+              - label:
+                  id: media_menu_sendspin_item_9
+                  align: TOP_LEFT
+                  y: 262
+                  width: 196
+                  text: "  ${media_name_9}"
+                  text_color: 0xFFFFFF
+
+              - label:
+                  id: media_menu_sendspin_item_10
+                  align: TOP_LEFT
+                  y: 290
+                  width: 196
+                  text: "  ${media_name_10}"
+                  text_color: 0xFFFFFF
+
 binary_sensor:
   - platform: gpio
     pin:
@@ -1977,16 +2430,40 @@ binary_sensor:
         then:
           - if:
               condition:
-                lambda: 'return id(control_menu_active);'
+                lambda: 'return id(media_menu_active);'
               then:
-                - script.execute: select_control_menu_item
+                - delay: 0s
               else:
-                - script.execute: toggle_selected_control_popup
+                - if:
+                    condition:
+                      lambda: 'return id(control_menu_active);'
+                    then:
+                      - script.execute: select_control_menu_item
+                    else:
+                      - script.execute: toggle_selected_control_popup
 
       - timing:
           - ON for at least 700ms
         then:
-          - script.execute: show_control_menu
+          - if:
+              condition:
+                lambda: 'return id(media_menu_active);'
+              then:
+                - delay: 0s
+              else:
+                - if:
+                    condition:
+                      lambda: 'return id(control_menu_active);'
+                    then:
+                      - script.execute: hide_control_menu
+                    else:
+                      - if:
+                          condition:
+                            lambda: 'return (!lv_obj_has_flag(id(popup_idle), LV_OBJ_FLAG_HIDDEN)) || (!lv_obj_has_flag(id(popup_sendspin), LV_OBJ_FLAG_HIDDEN));'
+                          then:
+                            - script.execute: hide_popup
+                          else:
+                            - script.execute: show_control_menu
 
   - platform: gpio
     pin:
@@ -1997,27 +2474,68 @@ binary_sensor:
     filters:
       - delayed_on_off: 20ms
     on_multi_click:
+      # Double click (Next track)
+      - timing:
+          - ON for at most 350ms
+          - OFF for at most 350ms
+          - ON for at most 350ms
+        then:
+          - if:
+              condition:
+                lambda: 'return id(control_menu_active) || (!lv_obj_has_flag(id(popup_idle), LV_OBJ_FLAG_HIDDEN)) || (!lv_obj_has_flag(id(popup_sendspin), LV_OBJ_FLAG_HIDDEN));'
+              then:
+                - delay: 0s
+              else:
+                - media_player.next: sendspin_group_media_player
+
+      # Single click (Play/stop, or select media menu item if menu is open)
       - timing:
           - ON for at most 350ms
           - OFF for at least 351ms
         then:
           - if:
               condition:
-                media_player.is_playing: sendspin_group_media_player
+                lambda: 'return id(control_menu_active) || (!lv_obj_has_flag(id(popup_idle), LV_OBJ_FLAG_HIDDEN)) || (!lv_obj_has_flag(id(popup_sendspin), LV_OBJ_FLAG_HIDDEN));'
               then:
-                - media_player.next: sendspin_group_media_player
+                - delay: 0s
               else:
-                - media_player.play: sendspin_group_media_player
+                - if:
+                    condition:
+                      lambda: 'return id(media_menu_active);'
+                    then:
+                      - script.execute: select_media_menu_item
+                    else:
+                      - if:
+                          condition:
+                            media_player.is_playing: sendspin_group_media_player
+                          then:
+                            - media_player.stop: sendspin_group_media_player
+                            - lvgl.page.show: idle_page
+                            - script.execute: led_red
+                          else:
+                            - media_player.play: sendspin_group_media_player
 
+      # Triple click (Previous track)
       - timing:
+          - ON for at most 350ms
+          - OFF for at most 350ms
           - ON for at most 350ms
           - OFF for at most 350ms
           - ON for at most 350ms
           - OFF for at least 351ms
         then:
-          - media_player.previous: sendspin_group_media_player
+          - if:
+              condition:
+                lambda: 'return id(control_menu_active) || (!lv_obj_has_flag(id(popup_idle), LV_OBJ_FLAG_HIDDEN)) || (!lv_obj_has_flag(id(popup_sendspin), LV_OBJ_FLAG_HIDDEN));'
+              then:
+                - delay: 0s
+              else:
+                - media_player.previous: sendspin_group_media_player
 
+      # Four clicks (Favorite)
       - timing:
+          - ON for at most 350ms
+          - OFF for at most 350ms
           - ON for at most 350ms
           - OFF for at most 350ms
           - ON for at most 350ms
@@ -2030,7 +2548,20 @@ binary_sensor:
               data:
                 entity_id: ${favorite_button_entity}
 
+      # Hold (Open/close media menu)
       - timing:
           - ON for at least 700ms
         then:
-          - media_player.pause: sendspin_group_media_player
+          - if:
+              condition:
+                lambda: 'return id(control_menu_active) || (!lv_obj_has_flag(id(popup_idle), LV_OBJ_FLAG_HIDDEN)) || (!lv_obj_has_flag(id(popup_sendspin), LV_OBJ_FLAG_HIDDEN));'
+              then:
+                - delay: 0s
+              else:
+                - if:
+                    condition:
+                      lambda: 'return id(media_menu_active);'
+                    then:
+                      - script.execute: hide_media_menu
+                    else:
+                      - script.execute: show_media_menu
