@@ -32,7 +32,7 @@ substitutions:
   ha_media_player_entity: media_player.sensspin_zero_control
 
   # Media Menu Items Configuration
-  media_item_count: "10" # Increase this when adding more items below (max 10)
+  media_item_count: "6" # Increase this when adding more items below (max 10)
 
   # Media links and names for menu
   media_name_1: "Random 500"
@@ -250,6 +250,7 @@ generic_image:
           id: album_art_widget
           src: sendspin_album_art
     on_image_error:
+      - script.stop: album_art_timeout_fallback
       - lambda: |-
           id(sendspin_album_art_valid) = false;
       - lvgl.image.update:
@@ -459,6 +460,9 @@ text_sensor:
     on_value:
       - lambda: |-
           id(sendspin_album_art_valid) = false;
+      - lvgl.image.update:
+          id: album_art_widget
+          src: fallback_playing_image
       - script.execute: album_art_timeout_fallback
       - lvgl.label.update:
           id: now_playing_title_label
@@ -472,6 +476,9 @@ text_sensor:
     on_value:
       - lambda: |-
           id(sendspin_album_art_valid) = false;
+      - lvgl.image.update:
+          id: album_art_widget
+          src: fallback_playing_image
       - script.execute: album_art_timeout_fallback
       - lvgl.label.update:
           id: now_playing_artist_label
@@ -483,6 +490,12 @@ text_sensor:
     id: album_title
     type: album
     on_value:
+      - lambda: |-
+          id(sendspin_album_art_valid) = false;
+      - lvgl.image.update:
+          id: album_art_widget
+          src: fallback_playing_image
+      - script.execute: album_art_timeout_fallback
       - lvgl.label.update:
           id: now_playing_album_label
           text: !lambda |-
@@ -640,6 +653,16 @@ font:
       family: Noto Sans
       weight: 300
     id: font_display
+    size: 18
+    glyphsets:
+      - GF_Latin_Core
+      - GF_Cyrillic_Core
+
+  - file:
+      type: gfonts
+      family: Noto Sans
+      weight: 700
+    id: font_display_bold
     size: 18
     glyphsets:
       - GF_Latin_Core
@@ -1070,6 +1093,15 @@ script:
                 id: popup_slider_sendspin
                 value: !lambda |-
                   return id(knob_control_pct);
+            - lambda: |-
+                const auto indicator_color = lv_color_hex(0xFFFF00);
+                const auto knob_color = id(knob_control_pct) <= 0 ? lv_color_hex(0xFF0000) : lv_color_hex(0xFFFFFF);
+                lv_obj_set_style_border_color(id(popup_idle), indicator_color, LV_PART_MAIN);
+                lv_obj_set_style_border_color(id(popup_sendspin), indicator_color, LV_PART_MAIN);
+                lv_obj_set_style_bg_color(id(popup_slider_idle), indicator_color, LV_PART_INDICATOR);
+                lv_obj_set_style_bg_color(id(popup_slider_sendspin), indicator_color, LV_PART_INDICATOR);
+                lv_obj_set_style_bg_color(id(popup_slider_idle), knob_color, LV_PART_KNOB);
+                lv_obj_set_style_bg_color(id(popup_slider_sendspin), knob_color, LV_PART_KNOB);
           else:
             - lvgl.label.update:
                 id: popup_title_idle
@@ -1086,6 +1118,15 @@ script:
                 id: popup_slider_sendspin
                 value: !lambda |-
                   return id(volume_control_pct);
+            - lambda: |-
+                const auto indicator_color = lv_color_hex(0x66CCFF);
+                const auto knob_color = id(volume_control_pct) <= 0 ? lv_color_hex(0xFF0000) : lv_color_hex(0xFFFFFF);
+                lv_obj_set_style_border_color(id(popup_idle), indicator_color, LV_PART_MAIN);
+                lv_obj_set_style_border_color(id(popup_sendspin), indicator_color, LV_PART_MAIN);
+                lv_obj_set_style_bg_color(id(popup_slider_idle), indicator_color, LV_PART_INDICATOR);
+                lv_obj_set_style_bg_color(id(popup_slider_sendspin), indicator_color, LV_PART_INDICATOR);
+                lv_obj_set_style_bg_color(id(popup_slider_idle), knob_color, LV_PART_KNOB);
+                lv_obj_set_style_bg_color(id(popup_slider_sendspin), knob_color, LV_PART_KNOB);
 
   - id: render_popup
     mode: restart
@@ -1170,7 +1211,13 @@ script:
           condition:
             lambda: 'return (!lv_obj_has_flag(id(popup_idle), LV_OBJ_FLAG_HIDDEN)) || (!lv_obj_has_flag(id(popup_sendspin), LV_OBJ_FLAG_HIDDEN));'
           then:
-            - script.execute: hide_popup
+            - if:
+                condition:
+                  lambda: 'return id(popup_mode_light);'
+                then:
+                  - script.execute: hide_popup
+                else:
+                  - script.execute: show_selected_control_popup
           else:
             - script.execute: show_selected_control_popup
 
@@ -2168,12 +2215,13 @@ lvgl:
             width: 232
             height: 24
             text: ""
-            text_color: 0xFFFFFF
+            text_color: 0xFFFF00
+            text_font: font_display_bold
             long_mode: CLIP
             text_align: CENTER
 
         - label:
-            id: now_playing_artist_label
+            id: now_playing_album_label
             align: TOP_MID
             y: 254
             width: 232
@@ -2183,12 +2231,12 @@ lvgl:
             text_align: CENTER
 
         - label:
-            id: now_playing_album_label
+            id: now_playing_artist_label
             align: TOP_MID
             y: 284
             width: 232
             text: ""
-            text_color: 0xFFFF00
+            text_color: 0xFFFFFF
             long_mode: SCROLL_CIRCULAR
             text_align: CENTER
 
@@ -2474,11 +2522,54 @@ binary_sensor:
     filters:
       - delayed_on_off: 20ms
     on_multi_click:
+      # Four clicks (Favorite)
+      - timing:
+          - ON for at most 350ms
+          - OFF for at most 350ms
+          - ON for at most 350ms
+          - OFF for at most 350ms
+          - ON for at most 350ms
+          - OFF for at most 350ms
+          - ON for at most 350ms
+          - OFF for at least 351ms
+        then:
+          - if:
+              condition:
+                lambda: 'return id(control_menu_active) || (!lv_obj_has_flag(id(popup_idle), LV_OBJ_FLAG_HIDDEN)) || (!lv_obj_has_flag(id(popup_sendspin), LV_OBJ_FLAG_HIDDEN));'
+              then:
+                - delay: 0s
+              else:
+                - logger.log:
+                    level: WARN
+                    format: "Favorite activated from media button 4-click"
+                - homeassistant.action:
+                    action: button.press
+                    data:
+                      entity_id: ${favorite_button_entity}
+
+      # Triple click (Previous track)
+      - timing:
+          - ON for at most 350ms
+          - OFF for at most 350ms
+          - ON for at most 350ms
+          - OFF for at most 350ms
+          - ON for at most 350ms
+          - OFF for at least 351ms
+        then:
+          - if:
+              condition:
+                lambda: 'return id(control_menu_active) || (!lv_obj_has_flag(id(popup_idle), LV_OBJ_FLAG_HIDDEN)) || (!lv_obj_has_flag(id(popup_sendspin), LV_OBJ_FLAG_HIDDEN));'
+              then:
+                - delay: 0s
+              else:
+                - media_player.previous: sendspin_group_media_player
+
       # Double click (Next track)
       - timing:
           - ON for at most 350ms
           - OFF for at most 350ms
           - ON for at most 350ms
+          - OFF for at least 351ms
         then:
           - if:
               condition:
@@ -2514,39 +2605,6 @@ binary_sensor:
                             - script.execute: led_red
                           else:
                             - media_player.play: sendspin_group_media_player
-
-      # Triple click (Previous track)
-      - timing:
-          - ON for at most 350ms
-          - OFF for at most 350ms
-          - ON for at most 350ms
-          - OFF for at most 350ms
-          - ON for at most 350ms
-          - OFF for at least 351ms
-        then:
-          - if:
-              condition:
-                lambda: 'return id(control_menu_active) || (!lv_obj_has_flag(id(popup_idle), LV_OBJ_FLAG_HIDDEN)) || (!lv_obj_has_flag(id(popup_sendspin), LV_OBJ_FLAG_HIDDEN));'
-              then:
-                - delay: 0s
-              else:
-                - media_player.previous: sendspin_group_media_player
-
-      # Four clicks (Favorite)
-      - timing:
-          - ON for at most 350ms
-          - OFF for at most 350ms
-          - ON for at most 350ms
-          - OFF for at most 350ms
-          - ON for at most 350ms
-          - OFF for at most 350ms
-          - ON for at most 350ms
-          - OFF for at least 351ms
-        then:
-          - homeassistant.action:
-              action: button.press
-              data:
-                entity_id: ${favorite_button_entity}
 
       # Hold (Open/close media menu)
       - timing:
