@@ -85,6 +85,13 @@ packages:
     files:
       - analog_speaker_config.yaml
 
+#  hw: #DIGITAL
+#    url: https://github.com/RealDeco/SendspinZero.git
+#    ref: main
+#    refresh: 0s
+#    files:
+#      - digital_speaker_config.yaml
+
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
@@ -104,6 +111,7 @@ esp32:
 
 logger:
   level: WARN
+  baud_rate: 0
 
 api:
   on_client_connected:
@@ -214,6 +222,16 @@ globals:
     initial_value: "1"
 
   - id: media_menu_turn_halfstep
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+  - id: media_button_click_count
+    type: int
+    restore_value: no
+    initial_value: "0"
+
+  - id: media_button_hold_fired
     type: bool
     restore_value: no
     initial_value: "false"
@@ -688,7 +706,7 @@ font:
       weight: 700
     id: font_temp_unit
     size: 22
-    glyphs: "°CF"
+    glyphs: "°CF-"
 
   - file:
       type: gfonts
@@ -1418,6 +1436,112 @@ script:
             - script.execute: hide_popup
             - script.execute: render_media_menu
 
+  - id: media_button_hold_action
+    mode: restart
+    then:
+      - if:
+          condition:
+            lambda: 'return id(control_menu_active) || (!lv_obj_has_flag(id(popup_idle), LV_OBJ_FLAG_HIDDEN)) || (!lv_obj_has_flag(id(popup_sendspin), LV_OBJ_FLAG_HIDDEN));'
+          then:
+            - delay: 0s
+          else:
+            - if:
+                condition:
+                  lambda: |-
+                    return id(media_menu_active) ||
+                      (!lv_obj_has_flag(id(media_menu_idle), LV_OBJ_FLAG_HIDDEN)) ||
+                      (!lv_obj_has_flag(id(media_menu_sendspin), LV_OBJ_FLAG_HIDDEN));
+                then:
+                  - script.execute: hide_media_menu
+                else:
+                  - script.execute: show_media_menu
+
+  - id: media_button_hold_check
+    mode: restart
+    then:
+      - delay: 700ms
+      - if:
+          condition:
+            binary_sensor.is_on: media_button
+          then:
+            - lambda: |-
+                id(media_button_hold_fired) = true;
+                id(media_button_click_count) = 0;
+            - script.execute: media_button_hold_action
+
+  - id: media_button_finalize_clicks
+    mode: restart
+    then:
+      - delay: 351ms
+      - if:
+          condition:
+            lambda: 'return !id(media_button_hold_fired);'
+          then:
+            - if:
+                condition:
+                  lambda: 'return id(control_menu_active) || (!lv_obj_has_flag(id(popup_idle), LV_OBJ_FLAG_HIDDEN)) || (!lv_obj_has_flag(id(popup_sendspin), LV_OBJ_FLAG_HIDDEN));'
+                then:
+                  - lambda: |-
+                      id(media_button_click_count) = 0;
+                else:
+                  - if:
+                      condition:
+                        lambda: 'return id(media_button_click_count) >= 4;'
+                      then:
+                        - logger.log:
+                            level: WARN
+                            format: "Favorite activated from media button 4-click"
+                        - homeassistant.action:
+                            action: button.press
+                            data:
+                              entity_id: ${favorite_button_entity}
+                        - lambda: |-
+                            id(media_button_click_count) = 0;
+                      else:
+                        - if:
+                            condition:
+                              lambda: 'return id(media_button_click_count) == 3;'
+                            then:
+                              - media_player.previous: sendspin_group_media_player
+                              - lambda: |-
+                                  id(media_button_click_count) = 0;
+                            else:
+                              - if:
+                                  condition:
+                                    lambda: 'return id(media_button_click_count) == 2;'
+                                  then:
+                                    - media_player.next: sendspin_group_media_player
+                                    - lambda: |-
+                                        id(media_button_click_count) = 0;
+                                  else:
+                                    - if:
+                                        condition:
+                                          lambda: 'return id(media_button_click_count) == 1;'
+                                        then:
+                                          - if:
+                                              condition:
+                                                lambda: 'return id(media_menu_active);'
+                                              then:
+                                                - script.execute: select_media_menu_item
+                                              else:
+                                                - if:
+                                                    condition:
+                                                      media_player.is_playing: sendspin_group_media_player
+                                                    then:
+                                                      - media_player.stop: sendspin_group_media_player
+                                                      - lvgl.page.show: idle_page
+                                                      - script.execute: led_red
+                                                    else:
+                                                      - media_player.play: sendspin_group_media_player
+                                          - lambda: |-
+                                              id(media_button_click_count) = 0;
+            - lambda: |-
+                id(media_button_hold_fired) = false;
+          else:
+            - lambda: |-
+                id(media_button_hold_fired) = false;
+                id(media_button_click_count) = 0;
+
   - id: select_media_menu_item
     mode: restart
     then:
@@ -1709,7 +1833,7 @@ lvgl:
                         align: CENTER
                         x: 76
                         y: -14
-                        text: "°C"
+                        text: "--"
                         text_color: 0xFFFF00
                         text_font: font_temp_unit
 
@@ -2097,11 +2221,11 @@ lvgl:
             align: TOP_MID
             y: 224
             width: 232
-            height: 24
+            height: 32
             text: ""
             text_color: 0xFFFF00
             text_font: font_display_bold
-            long_mode: CLIP
+            long_mode: SCROLL_CIRCULAR
             text_align: CENTER
 
         - label:
@@ -2405,105 +2529,22 @@ binary_sensor:
     id: media_button
     filters:
       - delayed_on_off: 20ms
-    on_multi_click:
-      # Four clicks (Favorite)
-      - timing:
-          - ON for at most 350ms
-          - OFF for at most 350ms
-          - ON for at most 350ms
-          - OFF for at most 350ms
-          - ON for at most 350ms
-          - OFF for at most 350ms
-          - ON for at most 350ms
-          - OFF for at least 351ms
-        then:
-          - if:
-              condition:
-                lambda: 'return id(control_menu_active) || (!lv_obj_has_flag(id(popup_idle), LV_OBJ_FLAG_HIDDEN)) || (!lv_obj_has_flag(id(popup_sendspin), LV_OBJ_FLAG_HIDDEN));'
-              then:
-                - delay: 0s
-              else:
-                - logger.log:
-                    level: WARN
-                    format: "Favorite activated from media button 4-click"
-                - homeassistant.action:
-                    action: button.press
-                    data:
-                      entity_id: ${favorite_button_entity}
-
-      # Triple click (Previous track)
-      - timing:
-          - ON for at most 350ms
-          - OFF for at most 350ms
-          - ON for at most 350ms
-          - OFF for at most 350ms
-          - ON for at most 350ms
-          - OFF for at least 351ms
-        then:
-          - if:
-              condition:
-                lambda: 'return id(control_menu_active) || (!lv_obj_has_flag(id(popup_idle), LV_OBJ_FLAG_HIDDEN)) || (!lv_obj_has_flag(id(popup_sendspin), LV_OBJ_FLAG_HIDDEN));'
-              then:
-                - delay: 0s
-              else:
-                - media_player.previous: sendspin_group_media_player
-
-      # Double click (Next track)
-      - timing:
-          - ON for at most 350ms
-          - OFF for at most 350ms
-          - ON for at most 350ms
-          - OFF for at least 351ms
-        then:
-          - if:
-              condition:
-                lambda: 'return id(control_menu_active) || (!lv_obj_has_flag(id(popup_idle), LV_OBJ_FLAG_HIDDEN)) || (!lv_obj_has_flag(id(popup_sendspin), LV_OBJ_FLAG_HIDDEN));'
-              then:
-                - delay: 0s
-              else:
-                - media_player.next: sendspin_group_media_player
-
-      # Single click (Play/stop, or select media menu item if menu is open)
-      - timing:
-          - ON for at most 350ms
-          - OFF for at least 351ms
-        then:
-          - if:
-              condition:
-                lambda: 'return id(control_menu_active) || (!lv_obj_has_flag(id(popup_idle), LV_OBJ_FLAG_HIDDEN)) || (!lv_obj_has_flag(id(popup_sendspin), LV_OBJ_FLAG_HIDDEN));'
-              then:
-                - delay: 0s
-              else:
-                - if:
-                    condition:
-                      lambda: 'return id(media_menu_active);'
-                    then:
-                      - script.execute: select_media_menu_item
-                    else:
-                      - if:
-                          condition:
-                            media_player.is_playing: sendspin_group_media_player
-                          then:
-                            - media_player.stop: sendspin_group_media_player
-                            - lvgl.page.show: idle_page
-                            - script.execute: led_red
-                          else:
-                            - media_player.play: sendspin_group_media_player
-
-      # Hold (Open/close media menu)
-      - timing:
-          - ON for at least 700ms
-        then:
-          - if:
-              condition:
-                lambda: 'return id(control_menu_active) || (!lv_obj_has_flag(id(popup_idle), LV_OBJ_FLAG_HIDDEN)) || (!lv_obj_has_flag(id(popup_sendspin), LV_OBJ_FLAG_HIDDEN));'
-              then:
-                - delay: 0s
-              else:
-                - if:
-                    condition:
-                      lambda: 'return id(media_menu_active);'
-                    then:
-                      - script.execute: hide_media_menu
-                    else:
-                      - script.execute: show_media_menu
+    on_press:
+      then:
+        - lambda: |-
+            id(media_button_hold_fired) = false;
+        - script.execute: media_button_hold_check
+    on_release:
+      then:
+        - script.stop: media_button_hold_check
+        - if:
+            condition:
+              lambda: 'return id(media_button_hold_fired);'
+            then:
+              - lambda: |-
+                  id(media_button_hold_fired) = false;
+                  id(media_button_click_count) = 0;
+            else:
+              - lambda: |-
+                  id(media_button_click_count) += 1;
+              - script.execute: media_button_finalize_clicks
