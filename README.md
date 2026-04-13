@@ -240,10 +240,21 @@ ESP32-S3 Zero and PCM5102A as above +
 
 ---
 
-## Display + Button Version (description coming later)
+## Display + Button Version
 
 <img width="1727" height="716" src="https://github.com/user-attachments/assets/c1b9a7c7-e729-4363-bc9f-79d61cc3c463" />
 
+3D files are in [`3D_Files`](3D_Files)
+
+### Pin Mapping
+
+Same as SendspinZero-Display + SendspinZero-Button
+
+### Parts
+
+same components as the other versions (esp32-s3 + PCM5102A DAC) +
+
+* 1.9" screen: [https://www.aliexpress.com/item/1005010424983352.html](https://www.aliexpress.com/item/1005010424983352.html)
 
 ---
 
