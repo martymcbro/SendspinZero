@@ -240,3 +240,10 @@ ESP32-S3 Zero and PCM5102A as above +
 
 ---
 
+## Display + Button Version (description coming later)
+
+<img width="1727" height="716" src="https://github.com/user-attachments/assets/c1b9a7c7-e729-4363-bc9f-79d61cc3c463" />
+
+
+---
+
