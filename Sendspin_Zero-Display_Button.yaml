@@ -20,13 +20,29 @@ substitutions:
   media_name_6: "Radio Vinyl"
   media_url_6: "https://live-bauerdk.sharp-stream.com/Vinyl_dk.mp3"
 
-#packages: #uncomment if you have a DAC connected.
-#  hw:
+packages:
+
+  extcomp:
+    url: https://github.com/RealDeco/xiaozhi-esphome.git
+    ref: main
+    refresh: 0s
+    files:
+      - devices/Under_Development/Modular/HW/sendspin-external_components.yaml
+
+# uncomment below if you have a DAC connected.
+
+#  audio:
 #    url: https://github.com/RealDeco/SendspinZero.git
 #    ref: main
 #    refresh: 0s
 #    files:
 #      - Sendspin_Zero-Display_Button-audio.yaml
+#  hw:
+#    url: https://github.com/RealDeco/SendspinZero.git
+#    ref: main
+#    refresh: 0s
+#    files:
+#      - analog_speaker_config.yaml
 
 esphome:
   name: ${name}
@@ -71,13 +87,6 @@ captive_portal:
 time:
   - platform: homeassistant
     id: homeassistant_time
-
-external_components:
-  - source:
-      type: git
-      url: https://github.com/kahrendt/esphome
-      ref: 890e33f99af2c2ea15dc74c3ec4cf32d25203526
-    components: [const, sendspin, generic_image]
 
 globals:
   - id: sendspin_album_art_valid
