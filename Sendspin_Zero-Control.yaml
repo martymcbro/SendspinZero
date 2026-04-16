@@ -75,9 +75,18 @@ substitutions:
   # display_offset_width: "0"
   # display_offset_height: "80"
 
-## END OF SETTINGS ###############################################################################################################################
+## SENDSPIN SETTINGS #############################################################################################################################
 
 packages:
+  extcomp:
+    url: https://github.com/RealDeco/xiaozhi-esphome.git
+    ref: main
+    refresh: 0s
+    files:
+      - devices/Under_Development/Modular/HW/sendspin-external_components.yaml
+
+## AUDIO SETTINGS ################################################################################################################################
+
   hw: #ANALOG
     url: https://github.com/RealDeco/SendspinZero.git
     ref: main
@@ -92,10 +101,13 @@ packages:
 #    files:
 #      - digital_speaker_config.yaml
 
+## END OF SETTINGS ###############################################################################################################################
+
+
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
-  min_version: 2026.3.0
+  min_version: 2026.4.0
   name_add_mac_suffix: false
   on_boot:
     priority: -100
@@ -143,21 +155,6 @@ captive_portal:
 time:
   - platform: homeassistant
     id: homeassistant_time
-
-external_components:
-  - source:
-      # https://github.com/esphome/esphome/pull/14933
-      type: git
-      url: https://github.com/kahrendt/esphome
-      ref: 890e33f99af2c2ea15dc74c3ec4cf32d25203526
-    components: [const, media_source, sendspin, generic_image]
-  - source:
-      # https://github.com/esphome/esphome/pull/12429
-      type: git
-      url: https://github.com/esphome/esphome
-      ref: ff8ce89556748509d7ee8724e12d9d43d3c8c1e8
-    refresh: 0s
-    components: [http_request]
 
 globals:
   - id: sendspin_album_art_valid
