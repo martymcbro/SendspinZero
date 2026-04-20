@@ -1,7 +1,7 @@
 ## SendspinZero NO Display for Analog + Digital Coax and Toslink versions WITHOUT display. Edit the settings below.
 substitutions:
   name: esphome-web-e82bb8
-  friendly_name: Sendspin Zero Toslink
+  friendly_name: Sendspin Zero No Speaker
 
 ## SETTINGS ######################################################################################################################################
 
@@ -23,19 +23,19 @@ packages:
 
 ## AUDIO SETTINGS ################################################################################################################################
 
-#  hw: #ANALOG
-#    url: https://github.com/RealDeco/SendspinZero.git
-#    ref: main
-#    refresh: 0s
-#    files:
-#      - analog_speaker_config.yaml
-
-  hw: #DIGITAL
+  hw: #ANALOG
     url: https://github.com/RealDeco/SendspinZero.git
     ref: main
     refresh: 0s
     files:
-      - digital_speaker_config.yaml
+      - analog_speaker_config.yaml
+
+#  hw: #DIGITAL
+#    url: https://github.com/RealDeco/SendspinZero.git
+#    ref: main
+#    refresh: 0s
+#    files:
+#      - digital_speaker_config.yaml
 
 ## END OF SETTINGS ###############################################################################################################################
 
