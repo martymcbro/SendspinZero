@@ -229,8 +229,10 @@ This version uses a combo board with a **rotary encoder + button + display i fou
 | ------------- | ----------- |
 | GPIO12        | TRA         |
 | GPIO13        | TRB         |
-| GPIO43        | PSH         |
-| GPIO44        | KO          |
+| GPIO43 (TX)   | PSH         |
+| GPIO44 (RX)   | KO          |
+
+(TX = GPIO43, RX=GPIO44 on the zero board)
 
 <img width="475" height="515" src="https://github.com/user-attachments/assets/52a29e76-ad97-437b-b1a9-84b53068b87b" />
 
