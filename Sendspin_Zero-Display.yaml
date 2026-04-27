@@ -41,14 +41,14 @@ packages:
 ## AUDIO SETTINGS ################################################################################################################################
 
   hw: #ANALOG
-    url: https://github.com/RealDeco/SendspinZero.git
+    url: https://github.com/martymcbro/SendspinZero.git
     ref: main
     refresh: 0s
     files:
       - analog_speaker_config.yaml
 
 #  hw: #DIGITAL
-#    url: https://github.com/RealDeco/SendspinZero.git
+#    url: https://github.com/martymcbro/SendspinZero.git
 #    ref: main
 #    refresh: 0s
 #    files:
