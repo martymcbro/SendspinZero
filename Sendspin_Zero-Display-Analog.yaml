@@ -30,16 +30,6 @@ substitutions:
   # display_offset_width: "0"
   # display_offset_height: "80"
 
-## SENDSPIN SETTINGS #############################################################################################################################
-
-external_components:
-
-  - source: github://pr#16057
-    components: [generic_image, sendspin]
-    refresh: 1h
-
-## END OF SETTINGS ###############################################################################################################################
-
   # I2S audio pins
   i2s_lrclk_pin: GPIO4
   i2s_bclk_pin: GPIO5
@@ -56,6 +46,16 @@ external_components:
   display_dc_pin: GPIO10
   display_reset_pin: GPIO9
   display_bl_pin: GPIO11
+
+## SENDSPIN SETTINGS #############################################################################################################################
+
+external_components:
+
+  - source: github://pr#16057
+    components: [generic_image, sendspin]
+    refresh: 1h
+
+## END OF SETTINGS ###############################################################################################################################
 
 esphome:
   name: ${name}
