@@ -28,6 +28,23 @@ substitutions:
   # display_offset_width: "0"
   # display_offset_height: "80"
 
+  # I2S audio pins
+  i2s_lrclk_pin: GPIO4
+  i2s_bclk_pin: GPIO5
+  i2s_dout_pin: GPIO6
+
+  # RGB LED
+  rgb_led_pin: GPIO21
+
+  # SPI pins (for display)
+  spi_clk_pin: GPIO7
+  spi_mosi_pin: GPIO8
+
+  # Display control pins
+  display_dc_pin: GPIO10
+  display_reset_pin: GPIO9
+  display_bl_pin: GPIO11
+
 ## SENDSPIN SETTINGS #############################################################################################################################
 
 packages:
@@ -55,23 +72,6 @@ packages:
 #      - digital_speaker_config.yaml
 
 ## END OF SETTINGS ###############################################################################################################################
-
-  # I2S audio pins
-  i2s_lrclk_pin: GPIO4
-  i2s_bclk_pin: GPIO5
-  i2s_dout_pin: GPIO6
-
-  # RGB LED
-  rgb_led_pin: GPIO21
-
-  # SPI pins (for display)
-  spi_clk_pin: GPIO7
-  spi_mosi_pin: GPIO8
-
-  # Display control pins
-  display_dc_pin: GPIO10
-  display_reset_pin: GPIO9
-  display_bl_pin: GPIO11
 
 esphome:
   name: ${name}
